@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ABOUT FORMULA1</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --f1-red: #ff1801;
+            --neon-cyan: #00f3ff;
+            --dark-bg: #0b0b0b;
+            --glass: rgba(10, 10, 10, 0.85); 
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--dark-bg);
+            color: #fff;
+            font-family: 'Rajdhani', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        #bg-layer {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0; 
+            background-size: cover;
+            background-position: center;
+            opacity: 0;
+            filter: blur(3px); 
+            transform: scale(1.1); 
+            transition: opacity 1s ease;
+        }
+
+        #webgl { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            z-index: 1; 
+            pointer-events: none; 
+        }
+        
+        .ui-layer { position: fixed; z-index: 100; width: 100%; height: 100%; pointer-events: none; }
+        .ui-layer * { pointer-events: auto; }
+
+        #loader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            z-index: 9999;
+        }
+        #binary-visual {
+            font-family: 'Orbitron', sans-serif; color: var(--f1-red);
+            font-size: 2rem; letter-spacing: 5px; margin-bottom: 20px;
+        }
+        .loading-bar { width: 200px; height: 2px; background: #333; }
+        .bar-fill { width: 0%; height: 100%; background: var(--f1-red); transition: width 0.5s; }
+
+        .section {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; padding-left: 15%;
+            z-index: 50;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+
+        .section.active { opacity: 1; pointer-events: auto; }
+
+        .hero-text h1 {
+            font-size: 6rem; font-family: 'Orbitron'; font-weight: 900; line-height: 1;
+            text-shadow: 0 0 30px rgba(255,255,255,0.2);
+        }
+        #hero-sub { font-size: 1.2rem; letter-spacing: 5px; color: var(--f1-red); margin-top: 10px;}
+
+        #info-card {
+            width: 600px;
+            background: var(--glass);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-left: 5px solid var(--f1-red);
+            padding: 40px;
+            transform: skewX(-5deg);
+            box-shadow: 0 30px 60px rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px); 
+        }
+        #info-card > * { transform: skewX(5deg); }
+
+        #card-title { font-size: 3rem; font-family: 'Orbitron'; line-height: 1; margin: 10px 0 20px; text-transform: uppercase; }
+        #card-subtitle { color: var(--f1-red); font-family: 'Orbitron'; letter-spacing: 2px; }
+
+        .stat-row { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding: 10px 0; }
+        .label { color: #888; font-weight: 700; font-size: 0.9rem; }
+        .value { font-weight: 500; text-align: right; }
+
+        .tech-section { margin-top: 20px; background: rgba(255,255,255,0.05); padding: 15px; border-left: 2px solid var(--neon-cyan); }
+        .label-tech { color: var(--neon-cyan); font-family: 'Orbitron'; font-size: 0.8rem; display: block; margin-bottom: 5px; }
+        #tech-desc { font-size: 0.9rem; line-height: 1.4; color: #ccc; }
+
+        .side-menu { position: fixed; bottom: 50px; left: 50px; z-index: 101; }
+        .side-menu ul { list-style: none; }
+        .side-menu li {
+            font-family: 'Orbitron'; font-size: 1.2rem; margin-bottom: 15px;
+            cursor: pointer; opacity: 0.5; transition: 0.3s;
+        }
+        .side-menu li:hover, .side-menu li.active-link { opacity: 1; color: var(--f1-red); padding-left: 10px; border-left: 3px solid var(--f1-red); }
+
+        .top-right { position: fixed; top: 40px; right: 60px; z-index: 101; font-family: 'Orbitron'; cursor: pointer; }
+        .lang-opt { opacity: 0.5; } 
+        .lang-opt.active { opacity: 1; color: var(--f1-red); }
+
+        .navigation {
+            position: absolute; bottom: 50px; right: 100px; z-index: 60;
+            display: flex; align-items: center; gap: 20px;
+        }
+        .nav-btn {
+            background: transparent; border: 1px solid #fff; color: #fff;
+            padding: 10px 20px; cursor: pointer; font-family: 'Orbitron';
+        }
+        .nav-btn:hover { background: var(--f1-red); border-color: var(--f1-red); }
+
+        @media screen and (max-width: 768px) {
+            .section {
+                padding-left: 0 !important; 
+                align-items: center !important; 
+                text-align: center;
+            }
+            .hero-text h1 { font-size: 3.5rem !important; }
+            #hero-sub { font-size: 0.9rem !important; letter-spacing: 2px !important; }
+            #info-card {
+                width: 90% !important; 
+                padding: 20px !important;
+                transform: none !important;
+                margin-bottom: 50px; 
+            }
+            #info-card > * { transform: none !important; } 
+            #card-title { font-size: 2rem !important; }
+            .stat-row { flex-direction: column; gap: 5px; text-align: center; }
+            .value { text-align: center !important; }
+            .side-menu {
+                bottom: 10px !important;
+                left: 0 !important;
+                width: 100%;
+                display: flex;
+                justify-content: center;
+                background: rgba(0,0,0,0.8); 
+                padding: 10px 0;
+            }
+            .side-menu ul { display: flex; gap: 15px; padding: 0; }
+            .side-menu li { font-size: 0.8rem !important; margin-bottom: 0 !important; border: none !important; padding: 0 !important; }
+            .side-menu li.active-link { color: var(--f1-red); text-decoration: underline; }
+            .navigation {
+                right: 50% !important;
+                transform: translateX(50%); 
+                bottom: 80px !important; 
+                width: 100%;
+                justify-content: center;
+            }
+            .top-right { top: 20px !important; right: 20px !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="bg-layer"></div>
+    
+    <canvas id="webgl"></canvas>
+
+    <div id="loader">
+        <div id="binary-visual">010101</div>
+        <div class="loading-bar"><div class="bar-fill"></div></div>
+        <p style="margin-top:10px; font-size:0.8rem; color:#666; font-family:'Orbitron'">SYSTEM INITIALIZING</p>
+    </div>
+
+    <div class="ui-layer">
+        <div class="top-right">
+            <span class="lang-opt active" data-lang="tr">TR</span> / 
+            <span class="lang-opt" data-lang="en">EN</span>
+        </div>
+
+        <div class="side-menu">
+            <ul>
+                <li onclick="app.navigate('home')" class="active-link" id="btn-home">ANA SAYFA</li>
+                <li onclick="app.navigate('history')" id="btn-history">TARİHÇE</li>
+                <li onclick="app.navigate('teams')" id="btn-teams">2025 TAKIMLAR</li>
+            </ul>
+        </div>
+    </div>
+
+    <section id="home" class="section active">
+        <div class="hero-text">
+            <h1>FORMULA 1</h1>
+            <p id="hero-sub">HIZIN VE MÜHENDİSLİĞİN ZİRVESİ</p>
+        </div>
+    </section>
+
+    <section id="slider-section" class="section">
+        <div id="info-card">
+            <div class="card-header">
+                <span id="card-subtitle">YEAR</span>
+                <h1 id="card-title">TITLE</h1>
+            </div>
+            <div class="card-body">
+                <div class="stat-row">
+                    <span class="label" id="lbl-1">SÜRÜCÜLER</span>
+                    <span class="value" id="val-1">...</span>
+                </div>
+                <div class="stat-row">
+                    <span class="label" id="lbl-2">TAKIM</span>
+                    <span class="value" id="val-2">...</span>
+                </div>
+                <div class="tech-section">
+                    <span class="label-tech" id="tech-title">TEKNİK NOT</span>
+                    <p id="tech-desc">...</p>
+                </div>
+            </div>
+        </div>
+        <div class="navigation">
+            <button class="nav-btn" onclick="app.prev()">PREV</button>
+            <span id="slide-counter" style="font-family:'Orbitron'">1/10</span>
+            <button class="nav-btn" onclick="app.next()">NEXT</button>
+        </div>
+    </section>
+
+
+    <script>
+       
+        const data = {
+            history: [
+                { 
+                    title: "1950 - 1959", 
+                    sub_tr: "BAŞLANGIÇ", sub_en: "THE BEGINNING",
+                    drv: "Fangio, Ascari", tm: "Alfa Romeo", 
+                    techT_tr: "SAF MEKANİK", techT_en: "PURE MECHANICS",
+                    techD_tr: "Motorlar öndeydi. Aerodinami yoktu. Sadece beygir gücü önemliydi.", 
+                    techD_en: "Engines were at the front. No aerodynamics. Only horsepower mattered.",
+                    img: "images/1950..jpg" 
+                },
+                { 
+                    title: "1960 - 1979", 
+                    sub_tr: "AERO DEVRİMİ", sub_en: "AERO REVOLUTION",
+                    drv: "Clark, Lauda", tm: "Lotus / Ferrari", 
+                    techT_tr: "KANATLAR", techT_en: "WINGS & AERO",
+                    techD_tr: "Motor arkaya alındı ve kanatlar icat edildi. Downforce çağı başladı.", 
+                    techD_en: "Engine moved to the back, wings were invented. Downforce era began.",
+                    img: "images/1960.jpeg" 
+                },
+                { 
+                    title: "1980 - 1999", 
+                    sub_tr: "TURBO & ELEKTRONİK", sub_en: "TURBO & ELECTRONICS",
+                    drv: "Senna, Prost", tm: "McLaren", 
+                    techT_tr: "1500 BEYGİR", techT_en: "1500 HP",
+                    techD_tr: "Turbo motorlar ve aktif süspansiyon ile araçlar bilgisayara dönüştü.", 
+                    techD_en: "Turbo engines and active suspension turned cars into computers.",
+                    img: "images/1980.jpg" 
+                },
+                { 
+                    title: "2000 - 2013", 
+                    sub_tr: "V10 & V8", sub_en: "V10 & V8 ERA",
+                    drv: "Schumacher, Vettel", tm: "Ferrari / Red Bull", 
+                    techT_tr: "HIZIN ZİRVESİ", techT_en: "PEAK SPEED",
+                    techD_tr: "V10 motorların çığlığı ve karmaşık aerodinamik kanatçıklar.", 
+                    techD_en: "Screaming V10 engines and complex aerodynamic winglets.",
+                    img: "images/2000.avif" 
+                },
+                { 
+                    title: "2014 - ...", 
+                    sub_tr: "HİBRİT ÇAĞI", sub_en: "HYBRID ERA",
+                    drv: "Hamilton, Verstappen", tm: "Mercedes / RB", 
+                    techT_tr: "GÜÇ ÜNİTESİ", techT_en: "POWER UNIT",
+                    techD_tr: "%50 termal verimliliğe sahip hibrit motorlar ve zemin etkisi.", 
+                    techD_en: "Hybrid engines with 50% thermal efficiency and ground effect.",
+                    img: "images/2014.webp" 
+                }
+            ],
+            teams: [
+                { 
+                    title: "FERRARI", 
+                    sub_tr: "2025 SEZONU", sub_en: "2025 SEASON",
+                    drv: "Hamilton - Leclerc", tm: "Scuderia Ferrari", 
+                    techT_tr: "PULL-ROD ÖN", techT_en: "PULL-ROD FRONT",
+                    techD_tr: "Hamilton'ın stiline uygun, çekme kollu ön süspansiyon tasarımı.", 
+                    techD_en: "Pull-rod front suspension design to suit Hamilton's style.",
+                    img: "images/ferrari.jpeg" 
+                },
+                { 
+                    title: "MERCEDES", 
+                    sub_tr: "2025 SEZONU", sub_en: "2025 SEASON",
+                    drv: "Russell - Antonelli", tm: "Mercedes AMG", 
+                    techT_tr: "W16 KONSEPTİ", techT_en: "W16 CONCEPT",
+                    techD_tr: "Zemin etkisi optimize edildi, dalgalanma tamamen çözüldü.", 
+                    techD_en: "Ground effect optimized, porpoising completely solved.",
+                    img: "images/mercedes.webp" 
+                },
+                { 
+                    title: "RED BULL", 
+                    sub_tr: "2025 SEZONU", sub_en: "2025 SEASON",
+                    drv: "Verstappen - Lawson", tm: "Red Bull Racing", 
+                    techT_tr: "RB21 EVRİMİ", techT_en: "RB21 EVOLUTION",
+                    techD_tr: "Newey sonrası dönemde daha dar sidepod girişleri.", 
+                    techD_en: "Narrower sidepod inlets in the post-Newey era.",
+                    img: "images/redbull.jpeg" 
+                },
+                { 
+                    title: "MCLAREN", 
+                    sub_tr: "2025 SEZONU", sub_en: "2025 SEASON",
+                    drv: "Norris - Piastri", tm: "McLaren F1", 
+                    techT_tr: "LASTİK KORUMA", techT_en: "TYRE SAVING",
+                    techD_tr: "Yarış temposunda lastikleri en iyi koruyan şasi yapısı.", 
+                    techD_en: "Chassis structure that preserves tyres best in race trim.",
+                    img: "images/mclaren.jpeg" 
+                },
+                { 
+                    title: "ASTON MARTIN", 
+                    sub_tr: "2025 SEZONU", sub_en: "2025 SEASON",
+                    drv: "Alonso - Stroll", tm: "Aston Martin", 
+                    techT_tr: "YENİ RÜZGAR TÜNELİ", techT_en: "NEW WIND TUNNEL",
+                    techD_tr: "Kendi rüzgar tünellerinde geliştirilen ilk tam araç.", 
+                    techD_en: "First full car developed in their own wind tunnel.",
+                    img: "images/astonmartin.avif" 
+                },
+                { 
+                    title: "ALPINE", 
+                    sub_tr: "2025 SEZONU", sub_en: "2025 SEASON",
+                    drv: "Gasly - Doohan", tm: "BWT Alpine", 
+                    techT_tr: "GÜÇ ÜNİTESİ", techT_en: "POWER UNIT",
+                    techD_tr: "Renault motorunun son yılı için elektrik optimizasyonu.", 
+                    techD_en: "Electric optimization for the final year of Renault engines.",
+                    img: "images/BWTAlphine.avif" 
+                },
+                { 
+                    title: "WILLIAMS", 
+                    sub_tr: "2025 SEZONU", sub_en: "2025 SEASON",
+                    drv: "Albon - Sainz", tm: "Williams Racing", 
+                    techT_tr: "HAFİFLETME", techT_en: "WEIGHT REDUCTION",
+                    techD_tr: "Karbon fiber soyularak ağırlık limiti altına inildi.", 
+                    techD_en: "Stripped carbon fibre to get under the weight limit.",
+                    img: "images/williamss.jpeg" 
+                },
+                { 
+                    title: "RB", 
+                    sub_tr: "2025 SEZONU", sub_en: "2025 SEASON",
+                    drv: "Tsunoda - Hadjar", tm: "Visa Cash App RB", 
+                    techT_tr: "RED BULL SİNERJİSİ", techT_en: "RED BULL SYNERGY",
+                    techD_tr: "Ana takımın arka süspansiyonunu birebir kullanıyor.", 
+                    techD_en: "Uses the main team's rear suspension identically.",
+                    img: "images/visacashapprb.jpeg" 
+                },
+                { 
+                    title: "SAUBER / AUDI", 
+                    sub_tr: "2025 SEZONU", sub_en: "2025 SEASON",
+                    drv: "Hulkenberg - Bortoleto", tm: "Stake F1 / Audi", 
+                    techT_tr: "AUDI GEÇİŞİ", techT_en: "AUDI TRANSITION",
+                    techD_tr: "2026 kuralları için Audi mühendisleriyle ortak tasarım.", 
+                    techD_en: "Joint design with Audi engineers for 2026 rules.",
+                    img: "images/stake.jpeg" 
+                },
+                { 
+                    title: "HAAS", 
+                    sub_tr: "2025 SEZONU", sub_en: "2025 SEASON",
+                    drv: "Ocon - Bearman", tm: "Haas F1 Team", 
+                    techT_tr: "FERRARI ORTAKLIĞI", techT_en: "FERRARI PARTNERSHIP",
+                    techD_tr: "Maksimum parça paylaşımı ile bütçe verimliliği.", 
+                    techD_en: "Budget efficiency through maximum parts sharing.",
+                    img: "images/haas.jpeg" 
+                }
+            ]
+        };
+
+        const uiText = {
+            tr: { 
+                home: "ANA SAYFA", 
+                history: "TARİHÇE", 
+                teams: "2025 TAKIMLAR", 
+                sub: "HIZ VE MÜHENDİSLİĞİN ZİRVESİ", 
+                hist_lbl1: "EFSANE PİLOTLAR", 
+                hist_lbl2: "DOMİNANT TAKIM", 
+                team_lbl1: "PİLOTLAR", 
+                team_lbl2: "TAKIM TAM ADI", 
+                tech: "TEKNİK DEVRİM" 
+            },
+            en: { 
+                home: "HOME", 
+                history: "HISTORY", 
+                teams: "2025 TEAMS", 
+                sub: "THE PINNACLE OF SPEED AND ENGINEERING", 
+                hist_lbl1: "LEGEND DRIVERS", 
+                hist_lbl2: "DOMINANT TEAM", 
+                team_lbl1: "DRIVERS", 
+                team_lbl2: "FULL TEAM NAME", 
+                tech: "TECH REVOLUTION" 
+            }
+        };
+
+        const app = {
+            lang: 'tr',
+            section: 'home',
+            category: 'history',
+            index: 0,
+
+            init: function() {
+                let w = 0;
+                const int = setInterval(() => {
+                    w += 5;
+                    document.querySelector('.bar-fill').style.width = w + '%';
+                    document.getElementById('binary-visual').innerText = Math.random().toString(2).substr(2, 6);
+                    
+                    if(w >= 100) {
+                        clearInterval(int);
+                        gsap.to("#loader", { opacity: 0, duration: 1, onComplete: () => document.getElementById('loader').style.display = 'none' });
+                        gsap.from(".hero-text", { y: 50, opacity: 0, duration: 1.5, delay: 0.5 });
+                    }
+                }, 50);
+                
+                document.querySelectorAll('.lang-opt').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        this.lang = e.target.getAttribute('data-lang');
+                        document.querySelectorAll('.lang-opt').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.updateUI();
+                        if(this.section !== 'home') this.renderCard();
+                    });
+                });
+            },
+
+            navigate: function(target) {
+                document.querySelectorAll('.side-menu li').forEach(li => li.classList.remove('active-link'));
+                document.getElementById('btn-' + target).classList.add('active-link');
+
+                this.section = target;
+                const homeSec = document.getElementById('home');
+                const sliderSec = document.getElementById('slider-section');
+                const bgLayer = document.getElementById('bg-layer');
+
+                if(target === 'home') {
+                    homeSec.classList.add('active');
+                    sliderSec.classList.remove('active');
+                    bgLayer.style.opacity = 0; 
+                } else {
+                    homeSec.classList.remove('active');
+                    sliderSec.classList.add('active');
+                    
+                    this.category = target; 
+                    this.index = 0;
+                    this.renderCard();
+                }
+            },
+
+            renderCard: function() {
+                const item = data[this.category][this.index];
+                const bgLayer = document.getElementById('bg-layer');
+                const t = uiText[this.lang];
+                const isTr = this.lang === 'tr';
+
+                const tl = gsap.timeline();
+                
+                tl.to("#info-card", { opacity: 0, x: -20, duration: 0.2 })
+                  .to(bgLayer, { opacity: 0, duration: 0.3 }, "-=0.2") 
+                  .call(() => {
+                      document.getElementById('card-subtitle').innerText = isTr ? item.sub_tr : item.sub_en;
+                      document.getElementById('card-title').innerText = item.title;
+                      
+                      if (this.category === 'history') {
+                          document.getElementById('lbl-1').innerText = t.hist_lbl1; 
+                          document.getElementById('lbl-2').innerText = t.hist_lbl2; 
+                      } else {
+                          document.getElementById('lbl-1').innerText = t.team_lbl1; 
+                          document.getElementById('lbl-2').innerText = t.team_lbl2; 
+                      }
+
+                      document.getElementById('val-1').innerText = item.drv;
+                      
+                      document.getElementById('val-2').innerText = item.tm; 
+                     
+                      document.getElementById('tech-title').innerText = t.tech + ": " + (isTr ? item.techT_tr : item.techT_en);
+                      document.getElementById('tech-desc').innerText = isTr ? item.techD_tr : item.techD_en;
+                      document.getElementById('slide-counter').innerText = `${this.index + 1} / ${data[this.category].length}`;
+                      
+                      bgLayer.style.backgroundImage = `url(${item.img})`;
+                  })
+                  .to(bgLayer, { opacity: 0.6, duration: 0.5 }) 
+                  .to("#info-card", { opacity: 1, x: 0, duration: 0.5 });
+            },
+
+            next: function() {
+                if(this.index < data[this.category].length - 1) {
+                    this.index++;
+                    this.renderCard();
+                }
+            },
+            prev: function() {
+                if(this.index > 0) {
+                    this.index--;
+                    this.renderCard();
+                }
+            },
+
+            updateUI: function() {
+                const t = uiText[this.lang];
+                document.getElementById('btn-home').innerText = t.home;
+                document.getElementById('btn-history').innerText = t.history;
+                document.getElementById('btn-teams').innerText = t.teams;
+                document.getElementById('hero-sub').innerText = t.sub;
+            }
+        };
+
+        app.init();
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('webgl'), alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        
+        const geo = new THREE.BufferGeometry();
+        const pos = [];
+        for(let i=0; i<2500; i++) {
+            pos.push((Math.random()-0.5)*15, (Math.random()-0.5)*15, (Math.random()-0.5)*15);
+        }
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        const mat = new THREE.PointsMaterial({size: 0.02, color: 0xffffff});
+        const parts = new THREE.Points(geo, mat);
+        scene.add(parts);
+        camera.position.z = 3;
+
+        let mouseX=0, mouseY=0;
+        document.addEventListener('mousemove', e => {
+            mouseX = e.clientX/window.innerWidth - 0.5;
+            mouseY = e.clientY/window.innerHeight - 0.5;
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            parts.rotation.y += 0.001;
+            parts.rotation.x += 0.0005;
+            
+            parts.rotation.x += mouseY * 0.05;
+            parts.rotation.y += mouseX * 0.05;
+            
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth/window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
